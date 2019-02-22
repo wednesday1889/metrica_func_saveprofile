@@ -1,0 +1,24 @@
+{
+    "extends": ["airbnb", "prettier"],
+    "plugins": ["prettier", "promise"],
+    "rules": {
+        "no-underscore-dangle": 0,
+        "import/imports-first": ["error", "absolute-first"],
+        "import/newline-after-import": "error",
+        "quotes": ["error", "double"],
+        "linebreak-style": ["error", "unix"],
+        "indent": ["error", 4],
+        "comma-dangle": "off",
+        "no-unused-expressions": ["error", { "allowTernary": true }]
+    },
+    "globals": {
+        "window": true,
+        "document": true,
+        "localStorage": true,
+        "FormData": true,
+        "FileReader": true,
+        "Blob": true,
+        "navigator": true,
+        "fetch": true
+    }
+}
