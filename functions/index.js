@@ -3,6 +3,16 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+const MCQ = "mcq";
+const CHALLENGE = "challenge";
+const QUESTIONS_COLLECTION = "questions";
+const EXAMS_COLLECTION = "exams";
+const CANDSTATUS_COLLECTION = "candidatestatus";
+const USERS_COLLECTION = "users";
+
+const INVALID_EXAM_CODE_MSG =
+    "The exam code provided did not match our records";
+
 exports.saveProfile = functions.https.onCall((data, context) => {
     const { email, examCode, firstName, lastName } = data;
     const isInvalid = !email || !examCode || !firstName || !lastName;
@@ -23,7 +33,7 @@ exports.saveProfile = functions.https.onCall((data, context) => {
 
     const db = admin.firestore();
 
-    const candStatusDoc = db.collection("candidatestatus").doc(email);
+    const candStatusDoc = db.collection(CANDSTATUS_COLLECTION).doc(email);
 
     return candStatusDoc
         .get()
@@ -35,7 +45,9 @@ exports.saveProfile = functions.https.onCall((data, context) => {
             if (candExamCode === examCode) {
                 return candStatusDoc.set(
                     {
-                        profileDone: true
+                        firstName,
+                        lastName,
+                        screeningStatus: 2
                     },
                     {
                         merge: true
@@ -44,12 +56,12 @@ exports.saveProfile = functions.https.onCall((data, context) => {
             }
             throw new functions.https.HttpsError(
                 "invalid-argument",
-                "The exam code provided did not match our records"
+                INVALID_EXAM_CODE_MSG
             );
         })
         .then(() => {
             const { uid } = context.auth;
-            const userDb = db.collection("users").doc(uid);
+            const userDb = db.collection(USERS_COLLECTION).doc(uid);
 
             return userDb.set(
                 {
@@ -100,19 +112,19 @@ exports.generateExam = functions.https.onCall((data, context) => {
 
     const db = admin.firestore();
 
-    const candStatusDoc = db.collection("candidatestatus").doc(email);
+    const candStatusDoc = db.collection(CANDSTATUS_COLLECTION).doc(email);
 
     const questionsArr = [];
 
     const processQuestionsForExamFields = (question, index) => {
-        if (question.type === "mcq") {
+        if (question.type === MCQ) {
             return {
                 qindex: index + 1,
                 questionText: question.questionText,
                 tsStarted: "",
                 tsAnswered: "",
                 duration: question.duration,
-                type: "mcq",
+                type: MCQ,
                 options: question.options,
                 answer: "",
                 codeSnippet: question.codeSnippet
@@ -124,7 +136,7 @@ exports.generateExam = functions.https.onCall((data, context) => {
             tsStarted: "",
             tsAnswered: "",
             duration: question.duration,
-            type: "challenge",
+            type: CHALLENGE,
             answer: question.answerTemplate
         };
     };
@@ -137,34 +149,24 @@ exports.generateExam = functions.https.onCall((data, context) => {
             const candExamCode = candidateStatus.examCode;
 
             if (candExamCode === examCode) {
-                return candStatusDoc.set(
-                    {
-                        profileDone: true
-                    },
-                    {
-                        merge: true
-                    }
-                );
+                return db
+                    .collection(QUESTIONS_COLLECTION)
+                    .orderBy("duration")
+                    .get();
             }
             throw new functions.https.HttpsError(
                 "invalid-argument",
-                "The exam code provided did not match our records"
+                INVALID_EXAM_CODE_MSG
             );
-        })
-        .then(() => {
-            return db
-                .collection("questions")
-                .orderBy("duration")
-                .get();
         })
         .then(querySnapshot => {
             querySnapshot.forEach(doc => {
                 const question = doc.data();
-                if (question.type === "mcq") {
+                if (question.type === MCQ) {
                     questionsArr.push({
                         questionText: question.questionText,
                         duration: question.duration,
-                        type: "mcq",
+                        type: MCQ,
                         options: question.options,
                         codeSnippet: question.codeSnippet
                     });
@@ -172,7 +174,7 @@ exports.generateExam = functions.https.onCall((data, context) => {
                     questionsArr.push({
                         questionText: question.questionText,
                         duration: question.duration,
-                        type: "challenge",
+                        type: CHALLENGE,
                         answerTemplate: question.answerTemplate
                     });
                 }
@@ -180,10 +182,10 @@ exports.generateExam = functions.https.onCall((data, context) => {
 
             // separate the mcqs and challenges first
             const mcQuestions = questionsArr.filter(
-                question => question.type === "mcq"
+                question => question.type === MCQ
             );
             const challenges = questionsArr.filter(
-                question => question.type === "challenge"
+                question => question.type === CHALLENGE
             );
 
             let examQuestions = [];
@@ -217,7 +219,7 @@ exports.generateExam = functions.https.onCall((data, context) => {
             );
 
             return db
-                .collection("exams")
+                .collection(EXAMS_COLLECTION)
                 .doc(email)
                 .set({
                     questions: finalExamQuestions,
