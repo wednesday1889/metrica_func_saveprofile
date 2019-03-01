@@ -149,6 +149,15 @@ exports.generateExam = functions.https.onCall((data, context) => {
             const candExamCode = candidateStatus.examCode;
 
             if (candExamCode === examCode) {
+                candStatusDoc.set(
+                    {
+                        screeningStatus: 3
+                    },
+                    {
+                        merge: true
+                    }
+                );
+
                 return db
                     .collection(QUESTIONS_COLLECTION)
                     .orderBy("duration")
