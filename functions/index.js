@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
@@ -12,6 +13,16 @@ const USERS_COLLECTION = "users";
 
 const INVALID_EXAM_CODE_MSG =
     "The exam code provided did not match our records";
+
+const gmailEmail = functions.config().gmail.email;
+const gmailPassword = functions.config().gmail.password;
+const mailTransport = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: gmailEmail,
+        pass: gmailPassword
+    }
+});
 
 exports.saveProfile = functions.https.onCall((data, context) => {
     const { email, examCode, firstName, lastName } = data;
@@ -273,7 +284,7 @@ exports.updateExam = functions.firestore
         const db = admin.firestore();
 
         const newValue = change.after.data();
-        const {email} = context.params;
+        const { email } = context.params;
         if (newValue.examDone === true) {
             const candStatusDoc = db
                 .collection(CANDSTATUS_COLLECTION)
@@ -293,12 +304,33 @@ exports.updateExam = functions.firestore
         return null;
     });
 
-/*
-
 exports.sendInviteToCandidate = functions.firestore
     .document("candidatestatus/{email}")
     .onCreate((snap, context) => {
         const candidateStatus = snap.data();
-        const email = candidateStatus.id;
+        const { examCode } = candidateStatus;
+        const { email } = context.params;
+        const registerUrl =
+            "https://onlineassessment-4343b.firebaseapp.com/signup";
+
+        const mailOptions = {
+            from: "\"Infor PSSC Online Assessment\" <noreply@firebase.com>",
+            to: email
+        };
+
+        mailOptions.subject = "Infor PSSC Online Assessment";
+        mailOptions.html = `<p>Welcome to the Infor PSSC Online Assessment!
+        <br/>Please register at: ${registerUrl}.<br/>After registering, please use this exam code when updating your profile: <strong>${examCode}</strong>
+        <br/>You will need this exam code prior to taking the exam.
+        <br/><br/>Thank you and happy coding!</p>`;
+
+        return mailTransport
+            .sendMail(mailOptions)
+            .then(() => console.log("Exam code email sent to:", email))
+            .catch(error =>
+                console.error(
+                    "There was an error while sending the email:",
+                    error
+                )
+            );
     });
-*/
