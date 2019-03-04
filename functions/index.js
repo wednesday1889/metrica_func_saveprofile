@@ -249,3 +249,56 @@ exports.generateExam = functions.https.onCall((data, context) => {
             );
         });
 });
+
+exports.setCandidateToRegistered = functions.auth.user().onCreate(user => {
+    const db = admin.firestore();
+    const { email } = user;
+
+    const candStatusDoc = db.collection(CANDSTATUS_COLLECTION).doc(email);
+    return candStatusDoc.get().then(() => {
+        candStatusDoc.set(
+            {
+                screeningStatus: 1
+            },
+            {
+                merge: true
+            }
+        );
+    });
+});
+
+exports.updateExam = functions.firestore
+    .document("exams/{email}")
+    .onUpdate((change, context) => {
+        const db = admin.firestore();
+
+        const newValue = change.after.data();
+        const {email} = context.params;
+        if (newValue.examDone === true) {
+            const candStatusDoc = db
+                .collection(CANDSTATUS_COLLECTION)
+                .doc(email);
+
+            return candStatusDoc.get().then(() => {
+                candStatusDoc.set(
+                    {
+                        screeningStatus: 4
+                    },
+                    {
+                        merge: true
+                    }
+                );
+            });
+        }
+        return null;
+    });
+
+/*
+
+exports.sendInviteToCandidate = functions.firestore
+    .document("candidatestatus/{email}")
+    .onCreate((snap, context) => {
+        const candidateStatus = snap.data();
+        const email = candidateStatus.id;
+    });
+*/
